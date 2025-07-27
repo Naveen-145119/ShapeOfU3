@@ -1,2 +1,19 @@
-node_modules
-.env 
+# Node.js
+node_modules/
+.env
+
+# pnpm
+pnpm-lock.yaml # If you manage a monorepo-style pnpm-lock at the root
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS
+.DS_Store
+.vscode/
+
+# Build artifacts for frontend (will be handled by frontend's .gitignore but good to have)
+/frontend/dist/

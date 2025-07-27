@@ -1,0 +1,20 @@
+{
+  "name": "shape-of-you-mern-naveen",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "pnpm install --prefix backend && pnpm install --prefix frontend && pnpm run build --prefix frontend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Naveen-145119/ShapeOfU3.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Naveen-145119/ShapeOfU3/issues"
+  },
+  "homepage": "https://github.com/Naveen-145119/ShapeOfU3#readme",
+  "description": ""
+}

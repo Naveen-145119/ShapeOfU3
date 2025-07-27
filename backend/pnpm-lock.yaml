@@ -41,6 +41,9 @@ importers:
       nodemailer:
         specifier: ^7.0.5
         version: 7.0.5
+      shape-of-you-mern-naveen:
+        specifier: file:..
+        version: file:..
       stripe:
         specifier: ^18.3.0
         version: 18.3.0
@@ -556,6 +559,9 @@ packages:
 
   setprototypeof@1.2.0:
     resolution: {integrity: sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==}
+
+  shape-of-you-mern-naveen@file:..:
+    resolution: {directory: .., type: directory}
 
   side-channel-list@1.0.0:
     resolution: {integrity: sha512-FCLHtRD/gnpCiCHEiJLOwdmFP+wzCmDEkc9y7NsYxeF4u7Btsn1ZuwgwJGxImImHicJArLP4R0yX4c2KCrMrTA==}
@@ -1191,6 +1197,8 @@ snapshots:
       - supports-color
 
   setprototypeof@1.2.0: {}
+
+  shape-of-you-mern-naveen@file:..: {}
 
   side-channel-list@1.0.0:
     dependencies:
