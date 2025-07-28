@@ -25,7 +25,7 @@ router.post('/payu-callback', handlePayuCallback); // ⭐ New route for PayU's r
 router.post('/initiate-payment', protect, initiatePayment); // ⭐ New route to initiate payment
 router.post('/', protect, bookingValidation, createBooking);
 router.get('/my-bookings', protect, getMyBookings); 
-router.post('/mock-payment/success', protect, mockPaymentSuccess); // Your mock payment route (keep for now if still using)
+//router.post('/mock-payment/success', protect, mockPaymentSuccess); // Your mock payment route (keep for now if still using)
 
 
 module.exports = router;
