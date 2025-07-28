@@ -52,7 +52,7 @@ function App() {
                 {/* ⭐ NEW: Payment Callback Routes */}
                 <Route path="/payment-success" element={<PaymentSuccessPage />} />
                 <Route path="/payment-failure" element={<PaymentFailurePage />} />
-                <Route path="/payment-status" element={<PaymentStatusPage />} />
+                {/*<Route path="/payment-status" element={<PaymentStatusPage />} />*/}
 
                 {/* Protected Routes */}
                 <Route path="/booking" element={<PrivateRoute><BookingPage /></PrivateRoute>} />
