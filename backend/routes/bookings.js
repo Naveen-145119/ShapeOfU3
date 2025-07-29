@@ -20,6 +20,8 @@ const bookingValidation = [
 
 // Public route for PayU callback (does NOT need 'protect' middleware)
 router.post('/payu-callback', handlePayuCallback); // ⭐ New route for PayU's response
+router.post('/payment-success', handlePayuCallback);
+router.post('/payment-failure', handlePayuCallback);
 
 // Protected routes for your application
 router.post('/initiate-payment', protect, initiatePayment); // ⭐ New route to initiate payment
