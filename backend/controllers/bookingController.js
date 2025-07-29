@@ -33,8 +33,8 @@ const initiatePayment = asyncHandler(async (req, res, next) => {
     // IMPORTANT: These should point to your backend's handlePayuCallback endpoint,
     // where your server will process the response and then redirect the user
     // to your frontend's success/failure page with proper query parameters.
-    const surlForPayU = `${process.env.NGROK_PUBLIC_URL}/api/bookings/payu-callback`; 
-    const furlForPayU = `${process.env.NGROK_PUBLIC_URL}/api/bookings/payu-callback`; 
+    const surlForPayU = `${process.env.NGROK_PUBLIC_URL}/payment-success`; 
+    const furlForPayU = `${process.env.NGROK_PUBLIC_URL}/payment-failure`; 
     
     const udf1 = booking._id.toString();
 
