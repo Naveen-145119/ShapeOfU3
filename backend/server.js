@@ -50,7 +50,8 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
-      process.env.FRONTEND_URL
+      process.env.FRONTEND_URL,
+      'https://test.payu.in'
     ].filter(Boolean);
     
     if (allowedOrigins.indexOf(origin) !== -1) {
@@ -94,7 +95,7 @@ app.use('/api/coupons', couponRoutes);
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'Shape of You 3 API Server',
+    message: 'ShapeOfU 3 API Server',
     version: '1.0.0',
     documentation: '/api/docs'
   });
