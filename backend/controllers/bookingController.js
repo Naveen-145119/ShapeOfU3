@@ -233,6 +233,13 @@ const handlePayuCallback = asyncHandler(async (req, res, next) => {
     const calculatedHash = crypto.createHash('sha512').update(hashString).digest('hex');
     console.log(`PayU Callback: Calculated Hash: ${calculatedHash}, Received Hash: ${hash}`);
 
+    // ⭐ ROBUSTNESS FIX: Use udf1 (which contains the bookingId) to find the booking.
+        const bookingId = udf1;
+        if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+            console.error('PayU Callback: Invalid booking ID in udf1:', bookingId);
+            return res.redirect(`${frontendFailureUrl}?status=invalid_booking_id&txnid=${txnid}`);
+        }
+
     const frontendSuccessUrl = process.env.FRONTEND_PAYMENT_SUCCESS_URL;
     const frontendFailureUrl = process.env.FRONTEND_PAYMENT_FAILURE_URL;
 
