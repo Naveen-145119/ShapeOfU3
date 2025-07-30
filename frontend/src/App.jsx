@@ -18,7 +18,6 @@ import MyBookingsPage from './pages/MyBookingsPage';
 import PrivateRoute from './components/PrivateRoute'; 
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import PaymentFailurePage from './pages/PaymentFailurePage';
-import PaymentStatusPage from './pages/PaymentStatusPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
