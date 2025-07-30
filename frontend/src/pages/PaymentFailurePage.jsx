@@ -1,6 +1,6 @@
-// test/frontend/shape-of-you-frontend/src/pages/PaymentFailurePage.jsx
+// frontend/src/pages/PaymentFailurePage.jsx
 
-import React from 'react';
+import React, { useEffect } from 'react'; // ⭐ FIX: Imported useEffect
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '../components/ui/button';
@@ -11,9 +11,10 @@ import toast from 'react-hot-toast';
 const PaymentFailurePage = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const txnid = queryParams.get('txnid'); // Example: PayU might return your transaction ID
-  const status = queryParams.get('status'); // Example: PayU might return status
-  const errorMessage = queryParams.get('error_message') || 'Payment failed due to an unknown error.'; // PayU might provide an error message
+  const txnid = queryParams.get('txnid');
+  const status = queryParams.get('status');
+  // ⭐ FIX: Changed 'error_message' to 'message' to match backend redirect
+  const errorMessage = queryParams.get('message') || 'Payment failed due to an unknown error.';
 
   useEffect(() => {
     toast.error('Payment failed. Please try again.');
