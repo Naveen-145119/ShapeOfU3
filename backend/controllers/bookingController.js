@@ -200,45 +200,19 @@ const handlePayuCallback = asyncHandler(async (req, res, next) => {
     const merchantKey = process.env.PAYU_MERCHANT_KEY;
     const salt = process.env.PAYU_SALT;
 
-    // Validate essential fields before proceeding
     if (!payuResponse.txnid || !payuResponse.status || !payuResponse.hash) {
         console.error('PayU Callback: Missing essential parameters.');
         return res.status(400).send('Missing Parameters');
     }
 
     const {
-        mihpayid,
-        txnid,
-        amount,
-        productinfo,
-        firstname,
-        email,
-        status,
-        hash,
-        udf1,
-        udf2, udf3, udf4, udf5, // Destructure all UDFs
-        udf6, udf7, udf8, udf9, udf10,
+        mihpayid, txnid, amount, productinfo, firstname, email, status, hash, udf1,
+        udf2, udf3, udf4, udf5, udf6, udf7, udf8, udf9, udf10,
     } = payuResponse;
 
-    // Ensure amount is formatted as a string with two decimal places if that's what PayU expects
     const formattedAmount = parseFloat(amount).toFixed(2);
-
-    console.log(`PayU Callback: Processing txnid: ${txnid}, status: ${status}, amount: ${formattedAmount}`);
-
-    // PayU's verification hash sequence:
-    // salt|status|udf10|udf9|udf8|udf7|udf6|udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key
     const hashString = `${salt}|${status}|${udf10 || ''}|${udf9 || ''}|${udf8 || ''}|${udf7 || ''}|${udf6 || ''}|${udf5 || ''}|${udf4 || ''}|${udf3 || ''}|${udf2 || ''}|${udf1 || ''}|${email}|${firstname}|${productinfo}|${formattedAmount}|${txnid}|${merchantKey}`;
-
-    console.log('PayU Callback: Hash String for Verification:', hashString);
     const calculatedHash = crypto.createHash('sha512').update(hashString).digest('hex');
-    console.log(`PayU Callback: Calculated Hash: ${calculatedHash}, Received Hash: ${hash}`);
-
-    // ⭐ ROBUSTNESS FIX: Use udf1 (which contains the bookingId) to find the booking.
-        const bookingId = udf1;
-        if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-            console.error('PayU Callback: Invalid booking ID in udf1:', bookingId);
-            return res.redirect(`${frontendFailureUrl}?status=invalid_booking_id&txnid=${txnid}`);
-        }
 
     const frontendSuccessUrl = process.env.FRONTEND_PAYMENT_SUCCESS_URL;
     const frontendFailureUrl = process.env.FRONTEND_PAYMENT_FAILURE_URL;
@@ -246,36 +220,46 @@ const handlePayuCallback = asyncHandler(async (req, res, next) => {
     if (calculatedHash === hash) {
         console.log('PayU Hash Verified: Match!');
 
-        // ⭐ ADD THIS LOG TO SEE WHAT TXNID YOU'RE SEARCHING FOR
-        console.log('Searching for booking with paymentId:', txnid);
+        const bookingId = udf1;
+        const booking = await Booking.findOne({ _id: bookingId, paymentId: txnid });
 
-        const booking = await Booking.findOne({ paymentId: txnid });
-
-        // ⭐ ADD THIS LOG TO SEE THE RESULT OF THE QUERY
-        console.log('Booking findOne result:', booking ? booking._id : 'Not Found');
-        
+        // ⭐ THE CRITICAL FIX IS HERE
         if (!booking) {
+            // If the booking is not found with the original txnid, it might have
+            // already been updated by a previous callback. Let's try to find it
+            // using the new PayU ID (mihpayid) to check if it's a duplicate.
+            const existingBooking = await Booking.findOne({ paymentId: mihpayid });
+            if (existingBooking && existingBooking.paymentStatus === 'completed') {
+                console.warn('PayU Callback: Duplicate callback received for booking:', existingBooking._id);
+                // Simply redirect back to the success page without doing anything.
+                return res.redirect(`${frontendSuccessUrl}?bookingId=${existingBooking._id}&txnid=${existingBooking.paymentId}&status=success`);
+            }
+            
             console.error('PayU Callback: Booking not found for txnid:', txnid);
             return res.redirect(`${frontendFailureUrl}?status=booking_not_found&txnid=${txnid}`);
         }
 
-        if (status === 'success') {
+        if (status === 'success' && booking.paymentStatus !== 'completed') {
             booking.paymentStatus = 'completed';
             booking.paymentMethod = 'payu';
             booking.payuResponse = payuResponse;
             booking.paymentId = mihpayid;
             await booking.save();
+
             console.log('Booking updated to completed:', booking._id);
-            // ⭐ NEW LOG: Confirming redirect is about to happen
-            console.log(`PayU Callback: Redirecting to success: ${frontendSuccessUrl}?bookingId=${booking._id}&txnid=${txnid}&status=success`); 
-            return res.redirect(`${frontendSuccessUrl}?bookingId=${booking._id}&txnid=${txnid}&status=success`);
+            return res.redirect(`${frontendSuccessUrl}?bookingId=${booking._id}&txnid=${mihpayid}&status=success`);
+        } else if (status === 'success' && booking.paymentStatus === 'completed') {
+            console.warn('PayU Callback: Duplicate successful callback ignored for booking:', booking._id);
+            // Redirect to success page again, since it was already processed.
+            return res.redirect(`${frontendSuccessUrl}?bookingId=${booking._id}&txnid=${booking.paymentId}&status=success`);
         } else {
-            booking.paymentStatus = 'failed';
-            booking.payuResponse = payuResponse;
-            await booking.save();
+            // This is the logic for a genuine payment failure
+            if (booking.paymentStatus !== 'completed') {
+                booking.paymentStatus = 'failed';
+                booking.payuResponse = payuResponse;
+                await booking.save();
+            }
             console.log('Booking updated to failed:', booking._id);
-            // ⭐ NEW LOG: Confirming redirect is about to happen
-            console.log(`PayU Callback: Redirecting to failure: ${frontendFailureUrl}?bookingId=${booking._id}&txnid=${txnid}&status=${status}&message=${encodeURIComponent(payuResponse.error_Message || 'Payment failed.')}`); 
             return res.redirect(`${frontendFailureUrl}?bookingId=${booking._id}&txnid=${txnid}&status=${status}&message=${encodeURIComponent(payuResponse.error_Message || 'Payment failed.')}`);
         }
     } else {
