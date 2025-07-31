@@ -246,7 +246,14 @@ const handlePayuCallback = asyncHandler(async (req, res, next) => {
     if (calculatedHash === hash) {
         console.log('PayU Hash Verified: Match!');
 
+        // ⭐ ADD THIS LOG TO SEE WHAT TXNID YOU'RE SEARCHING FOR
+        console.log('Searching for booking with paymentId:', txnid);
+
         const booking = await Booking.findOne({ paymentId: txnid });
+
+        // ⭐ ADD THIS LOG TO SEE THE RESULT OF THE QUERY
+        console.log('Booking findOne result:', booking ? booking._id : 'Not Found');
+        
         if (!booking) {
             console.error('PayU Callback: Booking not found for txnid:', txnid);
             return res.redirect(`${frontendFailureUrl}?status=booking_not_found&txnid=${txnid}`);
