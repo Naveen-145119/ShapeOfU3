@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react'; // For loading spinner
+import { Loader2 } from 'lucide-react'; 
 
 const MyBookingsPage = () => {
   const [bookings, setBookings] = useState([]);
@@ -117,7 +117,15 @@ const MyBookingsPage = () => {
                   <div>
                     <p className="text-muted-foreground">Your Referral Code:</p>
                     <p className="font-medium select-all">{booking.referral_code || 'N/A'}</p>
-                    <p className="text-xs text-muted-foreground">Share this code with friends to get rewards!</p>
+                    {/* ⭐ NEW: Show badge if referral code has been used */}
+                    {booking.referral_code && (
+                      <Badge
+                        variant={booking.referral_code_used ? 'destructive' : 'secondary'}
+                        className="mt-1"
+                      >
+                        {booking.referral_code_used ? 'Used' : 'Unused'}
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 {booking.event?.date && (
