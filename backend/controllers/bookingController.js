@@ -74,7 +74,8 @@ const createBooking = asyncHandler(async (req, res, next) => {
         firstName, lastName, email, phone, gender
     } = req.body;
 
-    let totalAmount = 1311; // base ticket price, adjust as needed
+    // Base price from your frontend logic
+    let totalAmount = 1311;
     let discountAmount = 0;
 
     // Prepare booking object
@@ -124,7 +125,7 @@ const createBooking = asyncHandler(async (req, res, next) => {
             const referredBooking = await Booking.findOne({
                 referral_code: code,
                 referral_code_used: false,
-                user: { $ne: user }  // prevent self-referral
+                user: { $ne: user }
             });
             if (!referredBooking) {
                 return next(new ErrorResponse(`Invalid, used, or self-referral code: ${code}`, 400));
@@ -136,7 +137,6 @@ const createBooking = asyncHandler(async (req, res, next) => {
             discountAmount += referredBookings.length * 50;
             bookingDataToSave.referral_coupons = referredBookings.map(b => b.referral_code);
 
-            // Mark referral codes as used by the current user
             for (const booking of referredBookings) {
                 booking.referral_code_used = true;
                 booking.referral_code_redeemed_by = user;
