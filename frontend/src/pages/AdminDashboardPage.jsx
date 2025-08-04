@@ -13,7 +13,6 @@ const AdminDashboardPage = () => {
   const [bookings, setBookings] = useState([]); 
   const [filteredBookings, setFilteredBookings] = useState([]);
   const [bookingSearchTerm, setBookingSearchTerm] = useState('');
-  // ⭐ NEW: State for sorting
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
 
@@ -31,6 +30,7 @@ const AdminDashboardPage = () => {
       try {
         const response = await adminAPI.getAllBookings(); 
         setBookings(response.data.data);
+        setFilteredBookings(response.data.data); // Initialize filtered bookings
       } catch (error) {
         console.error('Failed to fetch bookings:', error);
       }
@@ -47,7 +47,6 @@ const AdminDashboardPage = () => {
       result = result.filter(booking => {
         const userFullName = booking.user ? `${booking.user.firstName} ${booking.user.lastName}` : '';
         const userEmail = booking.user ? booking.user.email : '';
-
         return (
           (booking.bookingReference && booking.bookingReference.toLowerCase().includes(lowerCaseSearchTerm)) ||
           userFullName.toLowerCase().includes(lowerCaseSearchTerm) ||
@@ -57,23 +56,22 @@ const AdminDashboardPage = () => {
           (booking.paymentId && booking.paymentId.toLowerCase().includes(lowerCaseSearchTerm)) ||
           (booking.aadhar_number && booking.aadhar_number.toLowerCase().includes(lowerCaseSearchTerm)) ||
           (booking.coupon_code && booking.coupon_code.toLowerCase().includes(lowerCaseSearchTerm)) ||
-          (booking.referral_coupons && booking.referral_coupons.some(code => code.toLowerCase().includes(lowerCaseSearchTerm))) // ⭐ MODIFIED: Check referral codes
+          (booking.referral_coupons && booking.referral_coupons.some(code => code.toLowerCase().includes(lowerCaseSearchTerm)))
         );
       });
     }
 
-    // ⭐ NEW: Implement sorting logic on the frontend
     const sortedBookings = [...result].sort((a, b) => {
-      const aValue = a[sortBy];
-      const bValue = b[sortBy];
+        const aValue = a[sortBy];
+        const bValue = b[sortBy];
 
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
+        if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
     });
 
     setFilteredBookings(sortedBookings);
-  }, [bookingSearchTerm, bookings, sortBy, sortOrder]); // ⭐ MODIFIED: Re-filter and re-sort when state changes
+  }, [bookingSearchTerm, bookings, sortBy, sortOrder]);
 
   const handleRefresh = () => {
     window.location.reload(); 
@@ -90,7 +88,7 @@ const AdminDashboardPage = () => {
       'Category': booking.ticketType,
       'Aadhar Number': booking.aadhar_number || 'N/A',
       'Coupon Code': booking.coupon_code || 'N/A',
-      'Referral Code(s)': booking.referral_coupons.join(', ') || 'N/A',
+      'Referral Code(s)': booking.referral_coupons?.join(', ') || 'N/A',
       'Total Amount': booking.totalAmount,
       'Payment Status': booking.paymentStatus,
       'Payment Method': booking.paymentMethod,
@@ -103,7 +101,6 @@ const AdminDashboardPage = () => {
     XLSX.writeFile(workbook, 'bookings.xlsx'); 
   };
   
-  // ⭐ NEW: Function to handle sort changes
   const handleSort = (key) => {
     if (sortBy === key) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -118,7 +115,6 @@ const AdminDashboardPage = () => {
       case 'overview':
         return <OverviewTab stats={stats} />;
       case 'bookings':
-        // ⭐ MODIFIED: Pass sort state and handler to BookingsTab
         return <BookingsTab bookings={filteredBookings} setBookingSearchTerm={setBookingSearchTerm} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} />; 
       case 'analytics':
         return <AnalyticsTab />;
@@ -171,7 +167,6 @@ const OverviewTab = ({ stats }) => (
   </div>
 );
 
-// ⭐ MODIFIED BookingsTab to include sorting
 const BookingsTab = ({ bookings, setBookingSearchTerm, sortBy, sortOrder, onSort }) => (
   <div>
     <div className="flex justify-between items-center mb-6">
@@ -205,12 +200,12 @@ const BookingsTab = ({ bookings, setBookingSearchTerm, sortBy, sortOrder, onSort
           </tr>
         </thead>
         <tbody className="text-muted-foreground">
-          {filteredBookings.length === 0 ? (
+          {bookings.length === 0 ? (
             <tr>
               <td colSpan="16" className="py-3 px-6 text-center">No bookings found.</td>
             </tr>
           ) : (
-            filteredBookings.map((booking) => (
+            bookings.map((booking) => (
               <tr key={booking._id} className="border-b border-border">
                 <td className="py-3 px-6 text-xs">{booking.bookingReference || booking._id}</td>
                 <td className="py-3 px-6">{booking.user ? booking.user.firstName : 'N/A'}</td> 
@@ -253,7 +248,6 @@ const BookingsTab = ({ bookings, setBookingSearchTerm, sortBy, sortOrder, onSort
   </div>
 );
 
-// ⭐ NEW Component: A reusable table header that handles sorting UI
 const TableHeaderWithSort = ({ title, onClick, isSorted, sortOrder }) => (
   <th
     className="py-3 px-6 text-left cursor-pointer"
