@@ -1,4 +1,3 @@
-// test/backend/models/Booking.js
 const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema({
@@ -56,17 +55,17 @@ const bookingSchema = new mongoose.Schema({
     enum: ['confirmed', 'cancelled', 'attended', 'no-show'], 
     default: 'confirmed'
   },
-  // ⭐ ADDED: T-shirt Size field
+  // ⭐ T-shirt Size field
   tshirtSize: {
     type: String,
-    required: false // Or true if it's always mandatory
+    required: false 
   },
-  // ⭐ ADDED: Coupon Code field
+  // ⭐ Coupon Code field
   coupon_code: {
     type: String,
-    required: false // Or true if it's always mandatory
+    required: false 
   },
-  aadhar_number: { // This field is already present and correctly defined
+  aadhar_number: { 
     type: String,
     required: [true, 'Aadhar number is required']
   },
@@ -79,6 +78,21 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     required: false,
   }],
+  // NEW: unique referral code generated for this booking/user after success
+  referral_code: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  referral_code_used: {
+    type: Boolean,
+    default: false
+  },
+  referral_code_redeemed_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false
+  },
   referral_coupon_used: {
     type: Boolean,
     default: false,
@@ -152,6 +166,13 @@ bookingSchema.pre('save', function(next) {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).substr(2, 5);
     this.bookingReference = `SOY3-${timestamp}-${random}`.toUpperCase();
+  }
+  // Generate unique referral_code if payment is completed and no referral_code set yet
+  if (this.paymentStatus === 'completed' && !this.referral_code) {
+    const generateReferralCode = () => {
+      return Math.random().toString(36).substr(2, 8).toUpperCase();
+    };
+    this.referral_code = generateReferralCode();
   }
   next();
 });

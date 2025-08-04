@@ -14,7 +14,7 @@ const initiatePayment = asyncHandler(async (req, res, next) => {
         return next(new ErrorResponse('Booking not found', 404));
     }
     if (booking.paymentStatus === 'completed') {
-        return next(new Error(new ErrorResponse('This booking has already been paid.', 400))); // Ensure ErrorResponse is correctly handled by asyncHandler
+        return next(new ErrorResponse('This booking has already been paid.', 400)); 
     }
 
     const merchantKey = process.env.PAYU_MERCHANT_KEY;
@@ -28,18 +28,13 @@ const initiatePayment = asyncHandler(async (req, res, next) => {
     const email = booking.user ? booking.user.email : 'guest@example.com';
     const phone = booking.user ? booking.user.phone : '0000000000';
 
-    // ⭐ CRITICAL FIX: Send NGROK_PUBLIC_URL to PayU for surl/furl
-    // PayU will redirect user's browser to these URLs.
-    // IMPORTANT: These should point to your backend's handlePayuCallback endpoint,
-    // where your server will process the response and then redirect the user
-    // to your frontend's success/failure page with proper query parameters.
+    // URLs for PayU redirect after payment
     const surlForPayU = `${process.env.NGROK_PUBLIC_URL}/api/bookings/payment-success`; 
     const furlForPayU = `${process.env.NGROK_PUBLIC_URL}/api/bookings/payment-failure`; 
-    
+
     const udf1 = booking._id.toString();
 
-    // Hash string for Payment INITIATION (Frontend to PayU)
-    // Sequence: key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5|udf6|udf7|udf8|udf9|udf10|salt
+    // Hash string for Payment INITIATION 
     const hashString = `${merchantKey}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|${udf1}||||||||||${salt}`;
     const hash = crypto.createHash('sha512').update(hashString).digest('hex');
 
@@ -51,8 +46,8 @@ const initiatePayment = asyncHandler(async (req, res, next) => {
         firstname: firstname,
         email: email,
         phone: phone,
-        surl: surlForPayU, // ⭐ Now points to backend callback
-        furl: furlForPayU, // ⭐ Now points to backend callback
+        surl: surlForPayU,
+        furl: furlForPayU,
         hash: hash,
         udf1: udf1,
         action: payuPaymentUrl
@@ -79,9 +74,10 @@ const createBooking = asyncHandler(async (req, res, next) => {
         firstName, lastName, email, phone, gender
     } = req.body;
 
-    let totalAmount = 1311;
+    let totalAmount = 1311; // base ticket price, adjust as needed
     let discountAmount = 0;
 
+    // Prepare booking object
     const bookingDataToSave = {
         user,
         event: event && mongoose.Types.ObjectId.isValid(event) ? event : undefined,
@@ -104,6 +100,7 @@ const createBooking = asyncHandler(async (req, res, next) => {
         discount_amount: 0,
     };
 
+    // Process general coupon
     if (coupon_code) {
         const coupon = await Coupon.findOne({ code: coupon_code, is_active: true });
         if (coupon) {
@@ -115,6 +112,7 @@ const createBooking = asyncHandler(async (req, res, next) => {
         }
     }
 
+    // Process referral codes - up to 2 allowed
     if (referral_code) {
         const referralCodes = referral_code.split(',').map(code => code.trim());
         if (referralCodes.length > 2) {
@@ -123,18 +121,25 @@ const createBooking = asyncHandler(async (req, res, next) => {
 
         let referredBookings = [];
         for (const code of referralCodes) {
-            const referredBooking = await Booking.findOne({ bookingReference: code, referral_coupon_used: false });
+            const referredBooking = await Booking.findOne({
+                referral_code: code,
+                referral_code_used: false,
+                user: { $ne: user }  // prevent self-referral
+            });
             if (!referredBooking) {
-                return next(new ErrorResponse(`Invalid or already used referral code: ${code}`, 400));
+                return next(new ErrorResponse(`Invalid, used, or self-referral code: ${code}`, 400));
             }
             referredBookings.push(referredBooking);
         }
 
         if (referredBookings.length > 0) {
             discountAmount += referredBookings.length * 50;
-            bookingDataToSave.referral_coupons = referredBookings.map(b => b.bookingReference);
+            bookingDataToSave.referral_coupons = referredBookings.map(b => b.referral_code);
+
+            // Mark referral codes as used by the current user
             for (const booking of referredBookings) {
-                booking.referral_coupon_used = true;
+                booking.referral_code_used = true;
+                booking.referral_code_redeemed_by = user;
                 await booking.save();
             }
         }
@@ -223,18 +228,12 @@ const handlePayuCallback = asyncHandler(async (req, res, next) => {
         const bookingId = udf1;
         const booking = await Booking.findOne({ _id: bookingId, paymentId: txnid });
 
-        // ⭐ THE CRITICAL FIX IS HERE
         if (!booking) {
-            // If the booking is not found with the original txnid, it might have
-            // already been updated by a previous callback. Let's try to find it
-            // using the new PayU ID (mihpayid) to check if it's a duplicate.
             const existingBooking = await Booking.findOne({ paymentId: mihpayid });
             if (existingBooking && existingBooking.paymentStatus === 'completed') {
                 console.warn('PayU Callback: Duplicate callback received for booking:', existingBooking._id);
-                // Simply redirect back to the success page without doing anything.
                 return res.redirect(`${frontendSuccessUrl}?bookingId=${existingBooking._id}&txnid=${existingBooking.paymentId}&status=success`);
             }
-            
             console.error('PayU Callback: Booking not found for txnid:', txnid);
             return res.redirect(`${frontendFailureUrl}?status=booking_not_found&txnid=${txnid}`);
         }
@@ -250,10 +249,8 @@ const handlePayuCallback = asyncHandler(async (req, res, next) => {
             return res.redirect(`${frontendSuccessUrl}?bookingId=${booking._id}&txnid=${mihpayid}&status=success`);
         } else if (status === 'success' && booking.paymentStatus === 'completed') {
             console.warn('PayU Callback: Duplicate successful callback ignored for booking:', booking._id);
-            // Redirect to success page again, since it was already processed.
             return res.redirect(`${frontendSuccessUrl}?bookingId=${booking._id}&txnid=${booking.paymentId}&status=success`);
         } else {
-            // This is the logic for a genuine payment failure
             if (booking.paymentStatus !== 'completed') {
                 booking.paymentStatus = 'failed';
                 booking.payuResponse = payuResponse;

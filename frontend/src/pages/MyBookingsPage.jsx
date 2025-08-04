@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { bookingsAPI } from '../lib/api'; //
+import { bookingsAPI } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -24,9 +24,8 @@ const MyBookingsPage = () => {
       try {
         setLoading(true);
         setError(null);
-        // CHANGED: Now calls the specific 'getMyBookings' method from bookingsAPI
-        const response = await bookingsAPI.getMyBookings(); // Changed from bookingsAPI.get('/my-bookings')
-        setBookings(response.data.data || []); // Assuming response.data.data contains an array of bookings
+        const response = await bookingsAPI.getMyBookings();
+        setBookings(response.data.data || []);
       } catch (err) {
         console.error('Error fetching bookings:', err);
         setError('Failed to fetch bookings. Please try again later.');
@@ -78,10 +77,10 @@ const MyBookingsPage = () => {
             <Card key={booking._id}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-2xl font-semibold">
-                  {booking.eventName || 'Fitness Entrepreneur Event'}
+                  {booking.event?.name || 'Fitness Entrepreneur Event'}
                 </CardTitle>
-                <Badge 
-                  variant={booking.paymentStatus === 'succeeded' ? 'default' : 'destructive'}
+                <Badge
+                  variant={booking.paymentStatus === 'completed' ? 'default' : 'destructive'}
                   className="capitalize"
                 >
                   {booking.paymentStatus}
@@ -115,20 +114,25 @@ const MyBookingsPage = () => {
                       {booking.createdAt ? format(new Date(booking.createdAt), 'MMM dd, yyyy HH:mm') : 'N/A'}
                     </p>
                   </div>
+                  <div>
+                    <p className="text-muted-foreground">Your Referral Code:</p>
+                    <p className="font-medium select-all">{booking.referral_code || 'N/A'}</p>
+                    <p className="text-xs text-muted-foreground">Share this code with friends to get rewards!</p>
+                  </div>
                 </div>
-                {booking.eventDate && (
+                {booking.event?.date && (
                   <>
                     <Separator />
                     <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                       <span>Event Date:</span>
-                      <span className="font-medium text-foreground">{booking.eventDate}</span>
+                      <span className="font-medium text-foreground">{format(new Date(booking.event.date), 'MMM dd, yyyy')}</span>
                     </div>
                   </>
                 )}
-                {booking.eventLocation && (
+                {booking.event?.location && (
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                     <span>Location:</span>
-                    <span className="font-medium text-foreground">{booking.eventLocation}</span>
+                    <span className="font-medium text-foreground">{booking.event.location}</span>
                   </div>
                 )}
               </CardContent>
