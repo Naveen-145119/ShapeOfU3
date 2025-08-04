@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { bookingsAPI } from '../lib/api'; // Ensure bookingsAPI is imported
@@ -51,18 +52,9 @@ const schema = yup.object().shape({
   }),
 });
 
-const BASE_PRICE = 1311;
-
 const BookingPage = () => {
   const [step, setStep] = useState(1);
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    trigger,
-    formState: { errors },
-  } = useForm({
+  const { register, handleSubmit, watch, setValue, trigger, formState: { errors } } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
       has_college_coupon: false,
@@ -77,16 +69,15 @@ const BookingPage = () => {
   const hasCollegeCoupon = watch('has_college_coupon');
 
   const [appliedCouponDetails, setAppliedCouponDetails] = useState(null);
-  const [validReferralCodes, setValidReferralCodes] = useState([]);
-  const [referralDiscount, setReferralDiscount] = useState(0);
+  const BASE_PRICE = 1311;
 
   const [bookingDetails, setBookingDetails] = useState(null);
-  const [paymentResult, setPaymentResult] = useState(null); 
+  const [paymentResult, setPaymentResult] = useState(null); // Keep this for display on step 4, though actual payment will be via PayU
 
   const onSubmit = async (data) => {
-    const couponDiscount = appliedCouponDetails ? appliedCouponDetails.discount : 0;
-    const totalReferralDiscount = referralDiscount || 0;
-    const finalAmount = Math.max(0, BASE_PRICE - couponDiscount - totalReferralDiscount);
+    const finalAmount = appliedCouponDetails
+      ? Math.max(0, BASE_PRICE - appliedCouponDetails.discount)
+      : BASE_PRICE;
 
     setBookingDetails({
       ...data,
@@ -95,38 +86,47 @@ const BookingPage = () => {
       quantity: 1,
       totalAmount: finalAmount,
       coupon: appliedCouponDetails ? appliedCouponDetails.id : null,
-      referral_code: validReferralCodes.join(', '),
     });
     setStep(3); // Proceed to confirmation step
   };
 
   const handleConfirmBooking = async () => {
-    setStep(4); // proceed to payment step
+    console.log('Confirmed booking details:', bookingDetails);
+    // At this point, bookingDetails holds the final amount and coupon ID if applicable.
+    // We now move to the Payment step (Step 4), which will initiate the PayU process.
+    setStep(4);
   };
 
+  // ⭐ MODIFIED: handlePaymentSuccess now initiates PayU payment
   const handlePaymentSuccess = async () => {
     try {
+      // 1. Create the booking in your DB with initial 'pending' status
       const createBookingPayload = {
         ...bookingDetails,
-        paymentStatus: 'pending',
-        paymentMethod: 'payu',
+        paymentStatus: 'pending', // Initial status for PayU payment
+        paymentMethod: 'payu', // Indicate PayU will be used
+        // paymentId will be set by backend upon successful PayU initiation
       };
 
-      console.log('Booking creation payload:', createBookingPayload);
+      console.log('Frontend sending booking creation payload (for PayU initiation):', JSON.stringify(createBookingPayload, null, 2));
       const bookingResponse = await bookingsAPI.create(createBookingPayload);
       console.log('Booking successful:', bookingResponse.data);
 
-      const createdBookingId = bookingResponse.data.data._id;
+      const createdBookingId = bookingResponse.data.data._id; // Get the ID of the newly created booking
 
-      const paymentInitiationResponse = await bookingsAPI.initiatePayment({ bookingId: createdBookingId });
+      // 2. Initiate payment with PayU via your backend
+      const paymentInitiationResponse = await bookingsAPI.initiatePayment({
+        bookingId: createdBookingId, // Send the created booking ID to the backend
+      });
       console.log('PayU Initiation Response:', paymentInitiationResponse.data);
 
       if (paymentInitiationResponse.data.success && paymentInitiationResponse.data.data) {
         const payuFormData = paymentInitiationResponse.data.data;
-
+        
+        // ⭐ Create a dynamic form and submit it to redirect to PayU
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = payuFormData.action;
+        form.action = payuFormData.action; // PayU's payment URL
 
         for (const key in payuFormData) {
           if (Object.prototype.hasOwnProperty.call(payuFormData, key) && key !== 'action') {
@@ -137,23 +137,27 @@ const BookingPage = () => {
             form.appendChild(hiddenField);
           }
         }
-        document.body.appendChild(form);
-        form.submit();
 
+        document.body.appendChild(form);
+        form.submit(); // Submit the form to redirect to PayU
+        
         toast.success('Redirecting to PayU for payment...');
-        return;
+        // Prevent further execution or navigation here as user is redirecting
+        return; 
       } else {
         toast.error(paymentInitiationResponse.data.message || 'Failed to initiate payment.');
       }
+
     } catch (error) {
       console.error('Error during payment process:', error.response?.data || error);
       toast.error(error.response?.data?.message || 'Payment process failed. Please try again.');
     }
   };
 
-  const prevStep = () => setStep((prev) => prev - 1);
+  const prevStep = () => setStep(prev => prev - 1);
 
   const nextStep = async () => {
+    console.log('Next button clicked. Current step:', step);
     let isValid = false;
 
     if (step === 1) {
@@ -169,93 +173,66 @@ const BookingPage = () => {
       if (watch('has_referral_code')) fieldsToValidate.push('referral_code');
 
       isValid = await trigger(fieldsToValidate);
-      if (!isValid) return;
 
-      // Validate coupon if needed
-      if (hasCollegeCoupon) {
-        try {
-          const couponCode = watch('coupon_code');
-          const response = await couponsAPI.validateCoupon({ code: couponCode });
-
-          if (response.data.success && response.data.data) {
-            const validatedCoupon = response.data.data;
-            setAppliedCouponDetails({
-              id: validatedCoupon._id,
-              code: validatedCoupon.code,
-              discount: validatedCoupon.discount,
-            });
-            toast.success(`Coupon "${validatedCoupon.code}" applied! You'll get a discount of ₹${validatedCoupon.discount}.`);
-          } else {
-            toast.error(response.data.message || 'Invalid college coupon code.');
+      if (isValid) {
+        if (hasCollegeCoupon) {
+          try {
+            const couponCode = watch('coupon_code');
+            const response = await couponsAPI.validateCoupon({ code: couponCode }); 
+            
+            if (response.data.success && response.data.data) {
+              const validatedCoupon = response.data.data;
+              
+              setAppliedCouponDetails({
+                id: validatedCoupon._id, 
+                code: validatedCoupon.code,
+                discount: validatedCoupon.discount,
+              });
+              toast.success(`Coupon "${validatedCoupon.code}" applied! You'll get a discount of ₹${validatedCoupon.discount}.`);
+            } else {
+              toast.error(response.data.message || 'Invalid college coupon code.');
+              setAppliedCouponDetails(null);
+              return;
+            }
+          } catch (error) {
             setAppliedCouponDetails(null);
+            toast.error(error.response?.data?.message || 'Invalid college coupon code.');
             return;
           }
-        } catch (error) {
-          setAppliedCouponDetails(null);
-          toast.error(error.response?.data?.message || 'Invalid college coupon code.');
-          return;
-        }
-      } else {
-        setAppliedCouponDetails(null);
-      }
-
-      // Validate referral codes
-      if (watch('has_referral_code')) {
-        const referralInput = watch('referral_code') || '';
-        const codes = referralInput.split(',').map(c => c.trim()).filter(Boolean);
-
-        if (codes.length === 0) {
-          toast.error('Referral code is required.');
-          return;
-        }
-        if (codes.length > 2) {
-          toast.error('You can enter a maximum of 2 referral codes.');
-          return;
+        } else {
+            setAppliedCouponDetails(null);
         }
 
-        try {
-          const response = await bookingsAPI.validateReferralCodes({
-            codes,
-            userId: user._id,
-          });
-
-          if (response.data.success) {
-            setValidReferralCodes(response.data.validCodes);
-            setReferralDiscount(response.data.totalDiscount);
-          } else {
-            toast.error(response.data.message || 'Invalid referral codes.');
+        if (watch('has_referral_code')) {
+          if (!watch('referral_code')) {
+            toast.error('Referral code is required.');
             return;
           }
-        } catch (err) {
-          toast.error('Error validating referral codes.');
-          return;
         }
-      } else {
-        setValidReferralCodes([]);
-        setReferralDiscount(0);
+        handleSubmit(onSubmit)();
       }
-
-      await handleSubmit(onSubmit)();
     } else {
-      setStep((prev) => prev + 1);
+      setStep(prev => prev + 1);
     }
   };
 
   useEffect(() => {
     if (bookingDetails) {
-      const couponDisc = appliedCouponDetails ? appliedCouponDetails.discount : 0;
-      const totalDiscount = couponDisc + referralDiscount;
-      const newTotalAmount = Math.max(0, BASE_PRICE - totalDiscount);
-      if (newTotalAmount !== bookingDetails.totalAmount) {
-        setBookingDetails(prev => ({
-          ...prev,
-          totalAmount: newTotalAmount,
-          coupon: appliedCouponDetails ? appliedCouponDetails.id : null,
-          referral_code: validReferralCodes.join(', '),
-        }));
-      }
+        const currentBaseAmount = BASE_PRICE;
+        const currentDiscount = appliedCouponDetails ? appliedCouponDetails.discount : 0;
+        const newTotalAmount = Math.max(0, currentBaseAmount - currentDiscount);
+
+        if (newTotalAmount !== bookingDetails.totalAmount || 
+            (appliedCouponDetails ? appliedCouponDetails.id : null) !== bookingDetails.coupon) {
+            
+            setBookingDetails(prev => ({
+                ...prev,
+                totalAmount: newTotalAmount,
+                coupon: appliedCouponDetails ? appliedCouponDetails.id : null,
+            }));
+        }
     }
-  }, [appliedCouponDetails, referralDiscount, validReferralCodes]);
+  }, [appliedCouponDetails]);
 
   return (
     <div className="min-h-screen bg-background text-foreground py-20">
@@ -280,7 +257,7 @@ const BookingPage = () => {
 
           {step === 1 && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              {/* Personal Information form fields */}
+              <h2 className="text-2xl font-semibold mb-6">Personal Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="firstName">First Name</Label>
@@ -342,7 +319,7 @@ const BookingPage = () => {
 
           {step === 2 && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              {/* Category, coupons, and referral codes */}
+              <h2 className="text-2xl font-semibold mb-6">Event Category</h2>
               <Select onValueChange={(value) => setValue('category', value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a category" />
@@ -379,17 +356,12 @@ const BookingPage = () => {
 
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_college_coupon"
-                    {...register('has_college_coupon')}
-                    onCheckedChange={(checked) => {
-                      setValue('has_college_coupon', checked);
-                      if (!checked) {
-                        setValue('coupon_code', '');
-                        setAppliedCouponDetails(null);
-                      }
-                    }}
-                  />
+                  <Checkbox id="has_college_coupon" {...register('has_college_coupon')} onCheckedChange={(checked) => {
+                    setValue('has_college_coupon', checked);
+                    if (!checked) {
+                      setValue('coupon_code', '');
+                    }
+                  }} />
                   <Label htmlFor="has_college_coupon">I have a college coupon</Label>
                 </div>
 
@@ -402,18 +374,12 @@ const BookingPage = () => {
                 )}
 
                 <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_referral_code"
-                    {...register('has_referral_code')}
-                    onCheckedChange={(checked) => {
-                      setValue('has_referral_code', checked);
-                      if (!checked) {
-                        setValue('referral_code', '');
-                        setReferralDiscount(0);
-                        setValidReferralCodes([]);
-                      }
-                    }}
-                  />
+                  <Checkbox id="has_referral_code" {...register('has_referral_code')} onCheckedChange={(checked) => {
+                    setValue('has_referral_code', checked);
+                    if (!checked) {
+                      setValue('referral_code', '');
+                    }
+                  }} />
                   <Label htmlFor="has_referral_code">I have a referral code</Label>
                 </div>
 
@@ -428,9 +394,7 @@ const BookingPage = () => {
               </div>
 
               <div className="flex justify-between mt-8">
-                <Button onClick={prevStep} variant="outline">
-                  Previous
-                </Button>
+                <Button onClick={prevStep} variant="outline">Previous</Button>
                 <Button onClick={nextStep}>Next</Button>
               </div>
             </motion.div>
@@ -438,26 +402,23 @@ const BookingPage = () => {
 
           {step === 3 && bookingDetails && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <ConfirmationSection bookingDetails={bookingDetails} onConfirm={handleConfirmBooking} onEdit={prevStep} />
+              <ConfirmationSection
+                bookingDetails={bookingDetails}
+                onConfirm={handleConfirmBooking}
+                onEdit={prevStep}
+              />
             </motion.div>
           )}
 
-          {step === 4 && bookingDetails && (
+          {step === 4 && bookingDetails && ( // Removed paymentResult from condition as it's not used directly here anymore
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <h2 className="text-2xl font-semibold mb-6">Proceed to Payment</h2>
               <div className="bg-card p-6 rounded-lg shadow-lg space-y-4">
                 <p>You are about to be redirected to PayU to complete your payment.</p>
-                <p>
-                  <strong>Booking Amount:</strong> ₹{bookingDetails.totalAmount}
-                </p>
+                <p><strong>Booking Amount:</strong> ₹{bookingDetails.totalAmount}</p>
                 {appliedCouponDetails && (
                   <p className="text-sm text-muted-foreground">
                     (Coupon "{appliedCouponDetails.code}" applied: -₹{appliedCouponDetails.discount})
-                  </p>
-                )}
-                {validReferralCodes.length > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    (Referral code(s) applied: {validReferralCodes.join(', ')} discount: -₹{referralDiscount})
                   </p>
                 )}
               </div>
