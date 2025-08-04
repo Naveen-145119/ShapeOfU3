@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
+
 // Import database connection
 const connectDB = require('./config/database');
 
@@ -17,6 +18,7 @@ const eventRoutes = require('./routes/events');
 const bookingRoutes = require('./routes/bookings');
 const adminRoutes = require('./routes/admin');
 const couponRoutes = require('./routes/coupons');
+const referralCodeRoutes = require('./routes/referralCodeRoutes'); 
 // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Connect to database
@@ -89,6 +91,8 @@ app.use('/api/events', eventRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/coupons', couponRoutes);
+app.use('/api/referral-codes', referralCodeRoutes);
+
 
 
 // Root endpoint
