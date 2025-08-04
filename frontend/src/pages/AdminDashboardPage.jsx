@@ -11,8 +11,8 @@ const AdminDashboardPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
   const [bookings, setBookings] = useState([]); 
-  const [filteredBookings, setFilteredBookings] = useState([]); // ⭐ ADDED: State for filtered bookings
-  const [bookingSearchTerm, setBookingSearchTerm] = useState(''); // ⭐ ADDED: State for booking search term
+  const [filteredBookings, setFilteredBookings] = useState([]); 
+  const [bookingSearchTerm, setBookingSearchTerm] = useState(''); 
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -28,7 +28,7 @@ const AdminDashboardPage = () => {
       try {
         const response = await adminAPI.getAllBookings(); 
         setBookings(response.data.data);
-        setFilteredBookings(response.data.data); // Initialize filtered bookings with all bookings
+        setFilteredBookings(response.data.data); 
       } catch (error) {
         console.error('Failed to fetch bookings:', error);
       }
@@ -38,7 +38,6 @@ const AdminDashboardPage = () => {
     fetchBookings(); 
   }, []);
 
-  // ⭐ ADDED: useEffect for filtering bookings based on search term
   useEffect(() => {
     let result = bookings;
     if (bookingSearchTerm) {
@@ -60,7 +59,7 @@ const AdminDashboardPage = () => {
       });
     }
     setFilteredBookings(result);
-  }, [bookingSearchTerm, bookings]); // Re-filter when search term or original bookings change
+  }, [bookingSearchTerm, bookings]);
 
 
   const handleRefresh = () => {
@@ -68,7 +67,6 @@ const AdminDashboardPage = () => {
   };
 
   const handleExportExcel = () => {
-    // Export filtered bookings data
     const worksheet = XLSX.utils.json_to_sheet(filteredBookings.map(booking => ({ 
       'Booking ID': booking.bookingReference || booking._id,
       'First Name': booking.user ? booking.user.firstName : 'N/A',
@@ -79,6 +77,7 @@ const AdminDashboardPage = () => {
       'Category': booking.ticketType,
       'Aadhar Number': booking.aadhar_number || 'N/A',
       'Coupon Code': booking.coupon_code || 'N/A',
+      'Referral Code(s)': booking.referral_coupons.join(', ') || 'N/A', // ⭐ MODIFIED: Added referral codes
       'Total Amount': booking.totalAmount,
       'Payment Status': booking.paymentStatus,
       'Payment Method': booking.paymentMethod,
@@ -96,7 +95,7 @@ const AdminDashboardPage = () => {
       case 'overview':
         return <OverviewTab stats={stats} />;
       case 'bookings':
-        return <BookingsTab bookings={filteredBookings} setBookingSearchTerm={setBookingSearchTerm} />; // ⭐ Pass filteredBookings and setter
+        return <BookingsTab bookings={filteredBookings} setBookingSearchTerm={setBookingSearchTerm} />; 
       case 'analytics':
         return <AnalyticsTab />;
       default:
@@ -148,7 +147,7 @@ const OverviewTab = ({ stats }) => (
   </div>
 );
 
-// ⭐ UPDATED BookingsTab to include search bar
+// ⭐ MODIFIED BookingsTab to include new column
 const BookingsTab = ({ bookings, setBookingSearchTerm }) => (
   <div>
     <div className="flex justify-between items-center mb-6">
@@ -156,7 +155,7 @@ const BookingsTab = ({ bookings, setBookingSearchTerm }) => (
       <Input
         placeholder="Search bookings by ID, name, email, etc."
         className="w-64"
-        onChange={(e) => setBookingSearchTerm(e.target.value)} // ⭐ Set search term on change
+        onChange={(e) => setBookingSearchTerm(e.target.value)} 
       />
     </div>
     <div className="overflow-x-auto">
@@ -172,6 +171,7 @@ const BookingsTab = ({ bookings, setBookingSearchTerm }) => (
             <th className="py-3 px-6 text-left">Category</th>
             <th className="py-3 px-6 text-left">Aadhar No.</th> 
             <th className="py-3 px-6 text-left">Coupon Code</th> 
+            <th className="py-3 px-6 text-left">Referral Code(s)</th> {/* ⭐ NEW COLUMN */}
             <th className="py-3 px-6 text-left">Amount</th> 
             <th className="py-3 px-6 text-left">Payment Status</th>
             <th className="py-3 px-6 text-left">Payment Method</th>
@@ -183,7 +183,7 @@ const BookingsTab = ({ bookings, setBookingSearchTerm }) => (
         <tbody className="text-muted-foreground">
           {bookings.length === 0 ? (
             <tr>
-              <td colSpan="15" className="py-3 px-6 text-center">No bookings found.</td> 
+              <td colSpan="16" className="py-3 px-6 text-center">No bookings found.</td> {/* ⭐ MODIFIED: colspan to 16 */}
             </tr>
           ) : (
             bookings.map((booking) => (
@@ -197,6 +197,7 @@ const BookingsTab = ({ bookings, setBookingSearchTerm }) => (
                 <td className="py-3 px-6">{booking.ticketType}</td>
                 <td className="py-3 px-6">{booking.aadhar_number || 'N/A'}</td> 
                 <td className="py-3 px-6">{booking.coupon_code || 'N/A'}</td> 
+                <td className="py-3 px-6">{booking.referral_coupons?.join(', ') || 'N/A'}</td> {/* ⭐ NEW DATA COLUMN */}
                 <td className="py-3 px-6">₹{booking.totalAmount}</td> 
                 <td className="py-3 px-6">
                   <span className={`px-2 py-1 rounded-full text-xs ${
