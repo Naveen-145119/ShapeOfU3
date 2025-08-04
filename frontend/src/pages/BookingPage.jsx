@@ -10,7 +10,7 @@ import { Label } from '../components/ui/label';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { bookingsAPI, couponsAPI, referralCodesAPI } from '../lib/api'; // ⭐ MODIFIED: Import referralCodesAPI
+import { bookingsAPI, couponsAPI, referralCodesAPI } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -66,17 +66,15 @@ const BookingPage = () => {
 
   const category = watch('category');
   const hasCollegeCoupon = watch('has_college_coupon');
-  const hasReferralCode = watch('has_referral_code'); // ⭐ NEW: Watch the referral code checkbox state
-  const referralCodeValue = watch('referral_code'); // ⭐ NEW: Watch the referral code input value
-
+  const hasReferralCode = watch('has_referral_code');
+  const referralCodeValue = watch('referral_code');
 
   const [appliedCouponDetails, setAppliedCouponDetails] = useState(null);
-  const [appliedReferralDetails, setAppliedReferralDetails] = useState(null); // ⭐ NEW STATE: Store applied referral details
+  const [appliedReferralDetails, setAppliedReferralDetails] = useState(null);
   const BASE_PRICE = 1311;
 
   const [bookingDetails, setBookingDetails] = useState(null);
 
-  // ⭐ MODIFIED onSubmit function to handle the new state
   const onSubmit = (data) => {
     const couponDiscount = appliedCouponDetails ? appliedCouponDetails.discount : 0;
     const referralDiscount = appliedReferralDetails ? appliedReferralDetails.totalDiscount : 0;
@@ -88,18 +86,17 @@ const BookingPage = () => {
       ticketType: data.category,
       quantity: 1,
       totalAmount: finalAmount,
-      coupon_code: appliedCouponDetails ? appliedCouponDetails.code : null,
-      referral_code: appliedReferralDetails ? appliedReferralDetails.validCodes.join(',') : null,
+      // Pass the codes themselves, not just the details
+      coupon_code: data.coupon_code || null,
+      referral_code: data.referral_code || null,
     });
-    setStep(3); // Proceed to confirmation step
+    setStep(3);
   };
-
 
   const handleConfirmBooking = async () => {
     console.log('Confirmed booking details:', bookingDetails);
     setStep(4);
   };
-
 
   const handlePaymentSuccess = async () => {
     try {
@@ -154,7 +151,6 @@ const BookingPage = () => {
 
   const prevStep = () => setStep(prev => prev - 1);
 
-  // ⭐ MODIFIED: nextStep function to handle coupon and referral validation
   const nextStep = async () => {
     console.log('Next button clicked. Current step:', step);
     let isValid = false;
@@ -202,7 +198,7 @@ const BookingPage = () => {
             setAppliedCouponDetails(null);
         }
 
-        // ⭐ NEW: Handle referral code validation
+        // Handle referral code validation
         if (hasReferralCode && referralCodeValue) {
           try {
             const codes = referralCodeValue.split(',').map(code => code.trim());
@@ -236,7 +232,6 @@ const BookingPage = () => {
     if (bookingDetails) {
         const currentBaseAmount = BASE_PRICE;
         const couponDiscount = appliedCouponDetails ? appliedCouponDetails.discount : 0;
-        // ⭐ NEW: Include referral discount in calculation
         const referralDiscount = appliedReferralDetails ? appliedReferralDetails.totalDiscount : 0;
         const newTotalAmount = Math.max(0, currentBaseAmount - couponDiscount - referralDiscount);
 
@@ -247,7 +242,7 @@ const BookingPage = () => {
             }));
         }
     }
-  }, [appliedCouponDetails, appliedReferralDetails]); // ⭐ MODIFIED: Add appliedReferralDetails to dependency array
+  }, [appliedCouponDetails, appliedReferralDetails]);
 
   return (
     <div className="min-h-screen bg-background text-foreground py-20">
@@ -436,7 +431,7 @@ const BookingPage = () => {
                     (Coupon "{appliedCouponDetails.code}" applied: -₹{appliedCouponDetails.discount})
                   </p>
                 )}
-                {appliedReferralDetails && ( // ⭐ NEW: Display referral discount
+                {appliedReferralDetails && (
                   <p className="text-sm text-muted-foreground">
                     (Referral code(s) applied: -₹{appliedReferralDetails.totalDiscount})
                   </p>
