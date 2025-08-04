@@ -46,7 +46,7 @@ const initiatePayment = asyncHandler(async (req, res, next) => {
         firstname: firstname,
         email: email,
         phone: phone,
-        surl: surlForPayu,
+        surl: surlForPayU,
         furl: furlForPayU,
         hash: hash,
         udf1: udf1,
