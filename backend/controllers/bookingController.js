@@ -46,7 +46,7 @@ const initiatePayment = asyncHandler(async (req, res, next) => {
         firstname: firstname,
         email: email,
         phone: phone,
-        surl: surlForPayU,
+        surl: surlForPayu,
         furl: furlForPayU,
         hash: hash,
         udf1: udf1,
@@ -74,8 +74,7 @@ const createBooking = asyncHandler(async (req, res, next) => {
         firstName, lastName, email, phone, gender
     } = req.body;
 
-    // Base price from your frontend logic
-    let totalAmount = 1311;
+    let totalAmount = 1311; // base ticket price, adjust as needed
     let discountAmount = 0;
 
     // Prepare booking object
