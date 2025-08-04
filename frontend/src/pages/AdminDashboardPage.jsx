@@ -11,8 +11,11 @@ const AdminDashboardPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
   const [bookings, setBookings] = useState([]); 
-  const [filteredBookings, setFilteredBookings] = useState([]); 
-  const [bookingSearchTerm, setBookingSearchTerm] = useState(''); 
+  const [filteredBookings, setFilteredBookings] = useState([]);
+  const [bookingSearchTerm, setBookingSearchTerm] = useState('');
+  // ⭐ NEW: State for sorting
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -28,7 +31,6 @@ const AdminDashboardPage = () => {
       try {
         const response = await adminAPI.getAllBookings(); 
         setBookings(response.data.data);
-        setFilteredBookings(response.data.data); 
       } catch (error) {
         console.error('Failed to fetch bookings:', error);
       }
@@ -41,10 +43,10 @@ const AdminDashboardPage = () => {
   useEffect(() => {
     let result = bookings;
     if (bookingSearchTerm) {
+      const lowerCaseSearchTerm = bookingSearchTerm.toLowerCase();
       result = result.filter(booking => {
         const userFullName = booking.user ? `${booking.user.firstName} ${booking.user.lastName}` : '';
         const userEmail = booking.user ? booking.user.email : '';
-        const lowerCaseSearchTerm = bookingSearchTerm.toLowerCase();
 
         return (
           (booking.bookingReference && booking.bookingReference.toLowerCase().includes(lowerCaseSearchTerm)) ||
@@ -54,13 +56,24 @@ const AdminDashboardPage = () => {
           (booking.paymentStatus && booking.paymentStatus.toLowerCase().includes(lowerCaseSearchTerm)) ||
           (booking.paymentId && booking.paymentId.toLowerCase().includes(lowerCaseSearchTerm)) ||
           (booking.aadhar_number && booking.aadhar_number.toLowerCase().includes(lowerCaseSearchTerm)) ||
-          (booking.coupon_code && booking.coupon_code.toLowerCase().includes(lowerCaseSearchTerm))
+          (booking.coupon_code && booking.coupon_code.toLowerCase().includes(lowerCaseSearchTerm)) ||
+          (booking.referral_coupons && booking.referral_coupons.some(code => code.toLowerCase().includes(lowerCaseSearchTerm))) // ⭐ MODIFIED: Check referral codes
         );
       });
     }
-    setFilteredBookings(result);
-  }, [bookingSearchTerm, bookings]);
 
+    // ⭐ NEW: Implement sorting logic on the frontend
+    const sortedBookings = [...result].sort((a, b) => {
+      const aValue = a[sortBy];
+      const bValue = b[sortBy];
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    setFilteredBookings(sortedBookings);
+  }, [bookingSearchTerm, bookings, sortBy, sortOrder]); // ⭐ MODIFIED: Re-filter and re-sort when state changes
 
   const handleRefresh = () => {
     window.location.reload(); 
@@ -77,7 +90,7 @@ const AdminDashboardPage = () => {
       'Category': booking.ticketType,
       'Aadhar Number': booking.aadhar_number || 'N/A',
       'Coupon Code': booking.coupon_code || 'N/A',
-      'Referral Code(s)': booking.referral_coupons.join(', ') || 'N/A', // ⭐ MODIFIED: Added referral codes
+      'Referral Code(s)': booking.referral_coupons.join(', ') || 'N/A',
       'Total Amount': booking.totalAmount,
       'Payment Status': booking.paymentStatus,
       'Payment Method': booking.paymentMethod,
@@ -89,13 +102,24 @@ const AdminDashboardPage = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Bookings'); 
     XLSX.writeFile(workbook, 'bookings.xlsx'); 
   };
+  
+  // ⭐ NEW: Function to handle sort changes
+  const handleSort = (key) => {
+    if (sortBy === key) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(key);
+      setSortOrder('asc');
+    }
+  };
 
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
         return <OverviewTab stats={stats} />;
       case 'bookings':
-        return <BookingsTab bookings={filteredBookings} setBookingSearchTerm={setBookingSearchTerm} />; 
+        // ⭐ MODIFIED: Pass sort state and handler to BookingsTab
+        return <BookingsTab bookings={filteredBookings} setBookingSearchTerm={setBookingSearchTerm} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} />; 
       case 'analytics':
         return <AnalyticsTab />;
       default:
@@ -147,46 +171,46 @@ const OverviewTab = ({ stats }) => (
   </div>
 );
 
-// ⭐ MODIFIED BookingsTab to include new column
-const BookingsTab = ({ bookings, setBookingSearchTerm }) => (
+// ⭐ MODIFIED BookingsTab to include sorting
+const BookingsTab = ({ bookings, setBookingSearchTerm, sortBy, sortOrder, onSort }) => (
   <div>
     <div className="flex justify-between items-center mb-6">
       <h2 className="text-2xl font-semibold">All Bookings</h2>
       <Input
         placeholder="Search bookings by ID, name, email, etc."
         className="w-64"
-        onChange={(e) => setBookingSearchTerm(e.target.value)} 
+        onChange={(e) => setBookingSearchTerm(e.target.value)}
       />
     </div>
     <div className="overflow-x-auto">
       <table className="min-w-full bg-card">
         <thead>
           <tr>
-            <th className="py-3 px-6 text-left">Booking ID</th>
-            <th className="py-3 px-6 text-left">First Name</th> 
-            <th className="py-3 px-6 text-left">Last Name</th> 
-            <th className="py-3 px-6 text-left">Email</th>
-            <th className="py-3 px-6 text-left">Phone</th> 
-            <th className="py-3 px-6 text-left">T-shirt Size</th> 
-            <th className="py-3 px-6 text-left">Category</th>
-            <th className="py-3 px-6 text-left">Aadhar No.</th> 
-            <th className="py-3 px-6 text-left">Coupon Code</th> 
-            <th className="py-3 px-6 text-left">Referral Code(s)</th> {/* ⭐ NEW COLUMN */}
-            <th className="py-3 px-6 text-left">Amount</th> 
-            <th className="py-3 px-6 text-left">Payment Status</th>
-            <th className="py-3 px-6 text-left">Payment Method</th>
-            <th className="py-3 px-6 text-left">Payment ID</th> 
-            <th className="py-3 px-6 text-left">Status</th>
-            <th className="py-3 px-6 text-left">Booked Date</th>
+            <TableHeaderWithSort title="Booking ID" onClick={() => onSort('bookingReference')} isSorted={sortBy === 'bookingReference'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="First Name" onClick={() => onSort('user.firstName')} isSorted={sortBy === 'user.firstName'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Last Name" onClick={() => onSort('user.lastName')} isSorted={sortBy === 'user.lastName'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Email" onClick={() => onSort('user.email')} isSorted={sortBy === 'user.email'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Phone" onClick={() => onSort('user.phone')} isSorted={sortBy === 'user.phone'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="T-shirt Size" onClick={() => onSort('tshirtSize')} isSorted={sortBy === 'tshirtSize'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Category" onClick={() => onSort('ticketType')} isSorted={sortBy === 'ticketType'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Aadhar No." onClick={() => onSort('aadhar_number')} isSorted={sortBy === 'aadhar_number'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Coupon Code" onClick={() => onSort('coupon_code')} isSorted={sortBy === 'coupon_code'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Referral Code(s)" onClick={() => onSort('referral_coupons')} isSorted={sortBy === 'referral_coupons'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Amount" onClick={() => onSort('totalAmount')} isSorted={sortBy === 'totalAmount'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Payment Status" onClick={() => onSort('paymentStatus')} isSorted={sortBy === 'paymentStatus'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Payment Method" onClick={() => onSort('paymentMethod')} isSorted={sortBy === 'paymentMethod'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Payment ID" onClick={() => onSort('paymentId')} isSorted={sortBy === 'paymentId'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Status" onClick={() => onSort('status')} isSorted={sortBy === 'status'} sortOrder={sortOrder} />
+            <TableHeaderWithSort title="Booked Date" onClick={() => onSort('createdAt')} isSorted={sortBy === 'createdAt'} sortOrder={sortOrder} />
           </tr>
         </thead>
         <tbody className="text-muted-foreground">
-          {bookings.length === 0 ? (
+          {filteredBookings.length === 0 ? (
             <tr>
-              <td colSpan="16" className="py-3 px-6 text-center">No bookings found.</td> {/* ⭐ MODIFIED: colspan to 16 */}
+              <td colSpan="16" className="py-3 px-6 text-center">No bookings found.</td>
             </tr>
           ) : (
-            bookings.map((booking) => (
+            filteredBookings.map((booking) => (
               <tr key={booking._id} className="border-b border-border">
                 <td className="py-3 px-6 text-xs">{booking.bookingReference || booking._id}</td>
                 <td className="py-3 px-6">{booking.user ? booking.user.firstName : 'N/A'}</td> 
@@ -196,8 +220,8 @@ const BookingsTab = ({ bookings, setBookingSearchTerm }) => (
                 <td className="py-3 px-6">{booking.tshirtSize || 'N/A'}</td> 
                 <td className="py-3 px-6">{booking.ticketType}</td>
                 <td className="py-3 px-6">{booking.aadhar_number || 'N/A'}</td> 
-                <td className="py-3 px-6">{booking.coupon_code || 'N/A'}</td> 
-                <td className="py-3 px-6">{booking.referral_coupons?.join(', ') || 'N/A'}</td> {/* ⭐ NEW DATA COLUMN */}
+                <td className="py-3 px-6">{booking.coupon_code || 'N/A'}</td>
+                <td className="py-3 px-6">{booking.referral_coupons?.join(', ') || 'N/A'}</td>
                 <td className="py-3 px-6">₹{booking.totalAmount}</td> 
                 <td className="py-3 px-6">
                   <span className={`px-2 py-1 rounded-full text-xs ${
@@ -227,6 +251,23 @@ const BookingsTab = ({ bookings, setBookingSearchTerm }) => (
       </table>
     </div>
   </div>
+);
+
+// ⭐ NEW Component: A reusable table header that handles sorting UI
+const TableHeaderWithSort = ({ title, onClick, isSorted, sortOrder }) => (
+  <th
+    className="py-3 px-6 text-left cursor-pointer"
+    onClick={onClick}
+  >
+    <div className="flex items-center">
+      {title}
+      {isSorted && (
+        <span className="ml-2">
+          {sortOrder === 'asc' ? '▲' : '▼'}
+        </span>
+      )}
+    </div>
+  </th>
 );
 
 const AnalyticsTab = () => {
